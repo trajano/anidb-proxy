@@ -1,0 +1,42 @@
+name: Publish Docker image
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  caddy_push_to_ghcr_registry:
+    name: Caddy Push Docker image to GHCR.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log into registry ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta-caddy
+        uses: docker/metadata-action@v5
+        with:
+          flavor: |
+            latest=false
+            suffix=-caddy
+          images: ghcr.io/trajano/anidb-proxy
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: caddy
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-caddy.outputs.tags }}
+          labels: ${{ steps.meta-caddy.outputs.labels }}
