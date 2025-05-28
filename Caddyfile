@@ -79,6 +79,33 @@ handle @anidbhttp {
 	}
 }
 
+@search {
+	method GET
+	path /httpapi/search
+}
+handle @search {
+	cache
+	handle @tracingEnabled
+	tracing {
+		span {path}
+	}
+
+	rewrite * /index.php?task=search&{query}
+	reverse_proxy http://whoami {
+		header_up Host {upstream_hostport}
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		header_up Accept-Encoding identity
+		header_down -Cache-Control
+		header_down -Report-To
+		header_down -Content-Security-Policy-Report-Only
+		header_down -Cross-Origin-Opener-Policy
+		header_down -Cross-Origin-Resource-Policy
+		header_down -Link
+	}
+}
+
 # Debug endpoint, to check if any private information gets leaked
 @debug {
 	method GET
