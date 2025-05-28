@@ -1,0 +1,10 @@
+services:
+  anidb-proxy:
+    build:
+      context: .
+    volumes:
+      - anidb-proxy-data:/data/nuts
+    ports:
+      - 52000:80
+volumes:
+  anidb-proxy-data:
