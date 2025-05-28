@@ -84,7 +84,10 @@ handle @anidbhttp {
 	path /httpapi/search
 }
 handle @search {
-	cache
+	cache {
+		ttl 1h
+		default_cache_control public, max-age=3600
+	}
 	handle @tracingEnabled
 	tracing {
 		span {path}

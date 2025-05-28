@@ -5,6 +5,6 @@ services:
     volumes:
       - anidb-proxy-data:/data/nuts
     ports:
-      - 80
+      - ${ANIDB_PROXY_PORT:-}:80
 volumes:
   anidb-proxy-data:
