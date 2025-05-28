@@ -79,6 +79,33 @@ handle @anidbhttp {
 	}
 }
 
+@images {
+	method GET HEAD
+	path /images/main/* /httpapi/images/main/*
+}
+handle @images {
+	rewrite /httpapi/images/main/ /images/main/
+	handle @tracingEnabled
+	cache
+	tracing {
+		span {path}
+	}
+	reverse_proxy https://cdn.anidb.net {
+		header_up Host {upstream_hostport}
+		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		header_up Accept-Encoding identity
+		header_down -Cache-Control
+		header_down -Report-To
+		header_down -Content-Security-Policy-Report-Only
+		header_down -Cross-Origin-Opener-Policy
+		header_down -Cross-Origin-Resource-Policy
+		header_down -Link
+	}
+}
+
 @search {
 	method GET
 	path /httpapi/search
@@ -94,7 +121,7 @@ handle @search {
 	}
 
 	rewrite * /index.php?task=search&{query}
-	reverse_proxy http://whoami {
+	reverse_proxy https://anisearch.outrance.pl {
 		header_up Host {upstream_hostport}
 		header_up -X-Forwarded-For
 		header_up -X-Forwarded-Host
