@@ -1,6 +1,5 @@
 {
 	admin off
-
 }
 
 :80
@@ -9,9 +8,10 @@ encode
 
 @anime_titles {
 	method GET HEAD
-	path /api/anime-titles.xml.gz
+	path /api/anime-titles.xml.gz /httpapi/anime-titles.xml.gz
 }
 handle @anime_titles {
+rewrite * /api/anime-titles.xml.gz
 	cache {
 		ttl 27h
 		mode bypass
