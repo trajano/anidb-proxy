@@ -10,15 +10,15 @@
 		nuts {
 			configuration {
 				Dir /data/nuts
-       EntryIdxMode 1
-                RWMode 0
-                SegmentSize 1024
-                NodeNum 42
-                SyncEnable true
-                StartFileLoadingMode 1			}
+				EntryIdxMode 1
+				RWMode 0
+				SegmentSize 1024
+				NodeNum 42
+				SyncEnable true
+				StartFileLoadingMode 1
+			}
 		}
 	}
-
 }
 
 :80
@@ -27,12 +27,13 @@ encode
 
 @anime_titles {
 	method GET HEAD
-	path /api/anime-titles.xml.gz /httpapi/anime-titles.xml.gz
+	path /api/anime-titles.xml.gz /httpapi/anime-titles.xml.gz /api/anime-titles.dat.gz /httpapi/anime-titles.dat.gz
 }
 handle @anime_titles {
-rewrite * /api/anime-titles.xml.gz
+	rewrite /httpapi/anime-titles.dat.gz /api/anime-titles.dat.gz
+	rewrite /httpapi/anime-titles.xml.gz /api/anime-titles.xml.gz
 	handle @tracingEnabled
-cache
+	cache
 	tracing {
 		span {path}
 	}
@@ -57,7 +58,7 @@ cache
 	path /httpapi
 }
 handle @anidbhttp {
-cache
+	cache
 	handle @tracingEnabled
 	tracing {
 		span {path}

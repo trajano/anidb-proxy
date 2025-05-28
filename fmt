@@ -1,0 +1,2 @@
+#!/bin/sh
+docker run --rm -v $(pwd):/mnt mirror.gcr.io/library/caddy caddy fmt /mnt/Caddyfile --overwrite
