@@ -1,17 +1,5 @@
 {
 	admin off
-}
-
-:80
-@tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
-encode
-
-@anime_titles {
-	method GET HEAD
-	path /api/anime-titles.xml.gz /httpapi/anime-titles.xml.gz
-}
-handle @anime_titles {
-rewrite * /api/anime-titles.xml.gz
 	cache {
 		ttl 27h
 		mode bypass
@@ -30,11 +18,24 @@ rewrite * /api/anime-titles.xml.gz
                 StartFileLoadingMode 1			}
 		}
 	}
+
+}
+
+:80
+@tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
+encode
+
+@anime_titles {
+	method GET HEAD
+	path /api/anime-titles.xml.gz /httpapi/anime-titles.xml.gz
+}
+handle @anime_titles {
+rewrite * /api/anime-titles.xml.gz
 	handle @tracingEnabled
+cache
 	tracing {
 		span {path}
 	}
-
 	reverse_proxy https://anidb.net {
 		header_up Host {upstream_hostport}
 		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
@@ -56,24 +57,7 @@ rewrite * /api/anime-titles.xml.gz
 	path /httpapi
 }
 handle @anidbhttp {
-	cache {
-		ttl 27h
-		mode bypass
-		default_cache_control public, max-age=86400
-		key {
-			disable_scheme
-		}
-		nuts {
-			configuration {
-				Dir /data/nuts
-       EntryIdxMode 1
-                RWMode 0
-                SegmentSize 1024
-                NodeNum 42
-                SyncEnable true
-                StartFileLoadingMode 1			}
-		}
-	}
+cache
 	handle @tracingEnabled
 	tracing {
 		span {path}
