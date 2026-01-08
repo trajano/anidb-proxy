@@ -1,5 +1,6 @@
 {
 	admin off
+	debug
 	cache {
 		ttl 27h
 		mode bypass
