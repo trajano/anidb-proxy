@@ -3,10 +3,11 @@
 	debug
 	cache {
 		ttl 27h
-		mode bypass
+		# mode bypass
 		default_cache_control public, max-age=86400
 		key {
 			disable_scheme
+			disable_host
 		}
 		nuts {
 			configuration {
@@ -24,7 +25,10 @@
 
 :80
 @tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
-encode
+@compressible {
+	not path *.gz
+}
+encode @compressible 
 
 @anime_titles {
 	method GET HEAD
