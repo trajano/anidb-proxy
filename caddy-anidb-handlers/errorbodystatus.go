@@ -120,6 +120,7 @@ type bufferingWriter struct {
 	code        int
 	wroteHeader bool
 	decided     bool
+	streamed    bool
 	buf         bytes.Buffer
 }
 
@@ -149,6 +150,7 @@ func (bw *bufferingWriter) Write(p []byte) (int, error) {
 			bw.code = bw.status
 			bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
 		}
+		bw.streamed = true
 		bw.writeHeaderIfNeeded()
 		_, err := bw.ResponseWriter.Write(bw.buf.Bytes())
 		bw.buf.Reset()
@@ -169,6 +171,7 @@ func (bw *bufferingWriter) Flush() {
 			bw.code = bw.status
 			bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
 		}
+		bw.streamed = true
 		bw.writeHeaderIfNeeded()
 		if bw.buf.Len() > 0 {
 			bw.ResponseWriter.Write(bw.buf.Bytes())
@@ -220,6 +223,9 @@ func (bw *bufferingWriter) flushIfNeeded() {
 
 	if !bw.wroteHeader {
 		bw.code = http.StatusOK
+	}
+	if !bw.streamed {
+		bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(bw.buf.Len()))
 	}
 	bw.writeHeaderIfNeeded()
 	if bw.buf.Len() > 0 {

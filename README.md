@@ -12,7 +12,7 @@ This is a simple caching proxy for AniDB to prevent the rate limits by ensuring 
 
 The `/httpapi` route applies two extra behaviors:
 
-* Responses are delayed so each request takes at least 2 seconds.
+* Upstream calls are rate-limited so only one request is sent every 2 seconds (cache hits are returned immediately).
 * If the first bytes of the response (after gzip decoding) contain `<error code="500">`, the proxy
   rewrites the status to 500 and sets `Cache-Control: no-store` to avoid caching error responses.
 

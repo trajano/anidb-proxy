@@ -1,10 +1,9 @@
 package errorbodystatus
 
 import (
-	"bufio"
-	"bytes"
-	"net"
+	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -20,6 +19,8 @@ func init() {
 
 type MinDurationHandler struct {
 	Duration caddy.Duration `json:"duration,omitempty"`
+	mu       sync.Mutex
+	last     time.Time
 }
 
 func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
@@ -29,24 +30,16 @@ func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
-func (h MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	minDuration := time.Duration(h.Duration)
 	if minDuration <= 0 {
 		minDuration = 2 * time.Second
 	}
 
-	bw := &minDurationWriter{
-		ResponseWriter: w,
-		header:         make(http.Header),
-		minDuration:    minDuration,
-		start:          time.Now(),
-	}
-	err := next.ServeHTTP(bw, r)
-	if err != nil {
+	if err := h.waitForSlot(r.Context(), minDuration); err != nil {
 		return err
 	}
-	bw.flush()
-	return nil
+	return next.ServeHTTP(w, r)
 }
 
 func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -78,86 +71,25 @@ func parseMinDurationCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHand
 	return &handler, nil
 }
 
-type minDurationWriter struct {
-	http.ResponseWriter
+func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.Duration) error {
+	for {
+		h.mu.Lock()
+		now := time.Now()
+		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
+			h.last = now
+			h.mu.Unlock()
+			return nil
+		}
+		wait := h.last.Add(minDuration).Sub(now)
+		h.mu.Unlock()
 
-	header      http.Header
-	status      int
-	wroteHeader bool
-	buf         bytes.Buffer
-
-	minDuration time.Duration
-	start       time.Time
-	flushed     bool
-}
-
-func (bw *minDurationWriter) Header() http.Header {
-	return bw.header
-}
-
-func (bw *minDurationWriter) WriteHeader(status int) {
-	if bw.wroteHeader {
-		return
-	}
-	bw.wroteHeader = true
-	bw.status = status
-}
-
-func (bw *minDurationWriter) Write(p []byte) (int, error) {
-	if !bw.wroteHeader {
-		bw.WriteHeader(http.StatusOK)
-	}
-	_, _ = bw.buf.Write(p)
-	return len(p), nil
-}
-
-func (bw *minDurationWriter) Flush() {
-	// Intentionally suppress streaming flushes to honor the minimum duration.
-}
-
-func (bw *minDurationWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	bw.flush()
-	hijacker, ok := bw.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
-	}
-	return hijacker.Hijack()
-}
-
-func (bw *minDurationWriter) Push(target string, opts *http.PushOptions) error {
-	pusher, ok := bw.ResponseWriter.(http.Pusher)
-	if !ok {
-		return http.ErrNotSupported
-	}
-	return pusher.Push(target, opts)
-}
-
-func (bw *minDurationWriter) Unwrap() http.ResponseWriter {
-	return bw.ResponseWriter
-}
-
-func (bw *minDurationWriter) flush() {
-	if bw.flushed {
-		return
-	}
-	bw.flushed = true
-
-	if !bw.wroteHeader {
-		bw.status = http.StatusOK
-	}
-
-	elapsed := time.Since(bw.start)
-	if remaining := bw.minDuration - elapsed; remaining > 0 {
-		time.Sleep(remaining)
-	}
-
-	dst := bw.ResponseWriter.Header()
-	for key, values := range bw.header {
-		dst[key] = append([]string(nil), values...)
-	}
-	bw.ResponseWriter.WriteHeader(bw.status)
-	if bw.buf.Len() > 0 {
-		bw.ResponseWriter.Write(bw.buf.Bytes())
-		bw.buf.Reset()
+		timer := time.NewTimer(wait)
+		select {
+		case <-timer.C:
+			// Loop to re-check against the updated last time.
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		}
 	}
 }

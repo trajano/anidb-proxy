@@ -1,27 +1,28 @@
 {
 	admin off
-	order error_body_status before respond
+	# order decode_gzip before respond
 	order min_duration before respond
+	order error_body_status before respond
 	cache {
 		ttl 27h
 		default_cache_control public, max-age=86400
 		key {
 			disable_scheme
 			disable_host
+			disable_vary
 		}
-		nuts {
+		log_level debug
+		# Simplefs is chosen for simplicity and ease of debug at the expense of size.
+		simplefs {
+			path /cache
 			configuration {
-				Dir /data/nuts
-				EntryIdxMode 1
-				NodeNum 42
-				EnableHintFile true
-				EnableMergeV2 true
 			}
 		}
 	}
 }
 
 :80
+encode
 log {
 	output stdout
 	format json
@@ -33,10 +34,6 @@ log {
 }
 log_skip @healthcheck
 @tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
-@compressible {
-	not path *.gz
-}
-encode @compressible
 
 @anime_titles {
 	method GET HEAD
@@ -45,18 +42,9 @@ encode @compressible
 handle @anime_titles {
 	rewrite /httpapi/anime-titles.dat.gz /api/anime-titles.dat.gz
 	rewrite /httpapi/anime-titles.xml.gz /api/anime-titles.xml.gz
-	handle @tracingEnabled
 	cache
 	tracing {
 		span {path}
-	}
-	min_duration {
-		duration 2s
-	}
-	error_body_status {
-		prefix `<error code="500">`
-		status 500
-		max_bytes 256
 	}
 	reverse_proxy https://anidb.net {
 		header_up Host {upstream_hostport}
@@ -81,22 +69,28 @@ handle @anime_titles {
 	path /httpapi
 }
 handle @anidbhttp {
-	cache
 	handle @tracingEnabled
 	tracing {
 		span {path}
 	}
 
+	cache
 	min_duration {
+		# prevent flooding of multiple upstream requests
 		duration 2s
 	}
 	error_body_status {
-		prefix `<error code="500">`
-		status 500
+		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
+		prefix `<error`
+		# the API spec actually says it returns 200 status code regardless of errors.
+		status 200
+		# status 500
 		max_bytes 256
 	}
+
 	reverse_proxy http://api.anidb.net:9001 {
 		header_up Host {upstream_hostport}
+		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
 		header_up -X-Forwarded-For
 		header_up -X-Forwarded-Host
 		header_up -X-Forwarded-Proto
