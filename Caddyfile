@@ -70,6 +70,17 @@ handle @anidbhttp {
 		span {path}
 	}
 
+	rate_limit {
+		zone static_example {
+			match {
+				method GET
+			}
+			key    static
+			events 1
+			window 5s
+		}
+	}
+
 	reverse_proxy http://api.anidb.net:9001 {
 		@nocache {
 			status 3xx 4xx 5xx
