@@ -13,11 +13,13 @@
 			configuration {
 				Dir /data/nuts
 				EntryIdxMode 1
-				RWMode 0
-				SegmentSize 1024
+				# RWMode FileIO
+				# SegmentSize 2048
 				NodeNum 42
-				SyncEnable true
-				StartFileLoadingMode 1
+				# SyncEnable true
+				EnableHintFile true
+				EnableMergeV2 true
+				# StartFileLoadingMode 1
 			}
 		}
 	}
