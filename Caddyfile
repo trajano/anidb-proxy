@@ -41,7 +41,11 @@ handle @anime_titles {
 		@nocache 			status 3xx 4xx 5xx
 		handle_response @nocache {
 					header Cache-Control "no-store"
-		copy_response_headers exclude Cache-Control
+		
+	copy_response_headers {
+		exclude Cache-Control
+	}
+
 		copy_response
 		}
 		header_up Host {upstream_hostport}
@@ -63,6 +67,8 @@ handle @anime_titles {
 	method GET
 	path /httpapi
 }
+
+
 handle @anidbhttp {
 	cache
 	handle @tracingEnabled
@@ -83,11 +89,15 @@ handle @anidbhttp {
 
 	reverse_proxy http://api.anidb.net:9001 {
 		@nocache 			status 3xx 4xx 5xx
-		handle_response @nocache {
-					header Cache-Control "no-store"
-		copy_response_headers exclude Cache-Control
-		copy_response
-		}
+handle_response @nocache {
+	header Cache-Control "no-store"
+
+	copy_response_headers {
+		exclude Cache-Control
+	}
+
+	copy_response
+}
 
 		header_up Host {upstream_hostport}
 		header_up -X-Forwarded-For
@@ -115,12 +125,17 @@ handle @images {
 		span {path}
 	}
 	reverse_proxy https://cdn.anidb.net {
-		@nocache {
-			status 3xx 4xx 5xx
-		}
-		handle_response @nocache {
-			header Cache-Control "no-store"
-		}
+		@nocache 			status 3xx 4xx 5xx
+handle_response @nocache {
+	header Cache-Control "no-store"
+
+	copy_response_headers {
+		exclude Cache-Control
+	}
+
+	copy_response
+}
+
 		header_up Host {upstream_hostport}
 		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
 		header_up -X-Forwarded-For
@@ -152,12 +167,16 @@ handle @search {
 
 	rewrite * /index.php?task=search&{query}
 	reverse_proxy https://anisearch.outrance.pl {
-		@nocache {
-			status 3xx 4xx 5xx
-		}
-		handle_response @nocache {
-			header Cache-Control "no-store"
-		}
+		@nocache  status 3xx 4xx 5xx
+handle_response @nocache {
+	header Cache-Control "no-store"
+
+	copy_response_headers {
+		exclude Cache-Control
+	}
+
+	copy_response
+}
 		header_up Host {upstream_hostport}
 		header_up -X-Forwarded-For
 		header_up -X-Forwarded-Host
