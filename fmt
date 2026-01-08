@@ -1,2 +1,4 @@
 #!/bin/sh
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
 docker run --rm -v $(pwd):/mnt mirror.gcr.io/library/caddy caddy fmt /mnt/Caddyfile --overwrite

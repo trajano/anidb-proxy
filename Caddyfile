@@ -1,5 +1,7 @@
 {
 	admin off
+	order error_body_status before respond
+	order min_duration before respond
 	cache {
 		ttl 27h
 		default_cache_control public, max-age=86400
@@ -24,11 +26,17 @@ log {
 	output stdout
 	format json
 }
+@healthcheck {
+	remote_ip 127.0.0.1
+	path /
+	header User-Agent Wget
+}
+log_skip @healthcheck
 @tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
 @compressible {
 	not path *.gz
 }
-encode @compressible 
+encode @compressible
 
 @anime_titles {
 	method GET HEAD
@@ -41,6 +49,14 @@ handle @anime_titles {
 	cache
 	tracing {
 		span {path}
+	}
+	min_duration {
+		duration 2s
+	}
+	error_body_status {
+		prefix `<error code="500">`
+		status 500
+		max_bytes 256
 	}
 	reverse_proxy https://anidb.net {
 		header_up Host {upstream_hostport}
@@ -71,6 +87,14 @@ handle @anidbhttp {
 		span {path}
 	}
 
+	min_duration {
+		duration 2s
+	}
+	error_body_status {
+		prefix `<error code="500">`
+		status 500
+		max_bytes 256
+	}
 	reverse_proxy http://api.anidb.net:9001 {
 		header_up Host {upstream_hostport}
 		header_up -X-Forwarded-For
