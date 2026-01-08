@@ -3,10 +3,9 @@ FROM caddy:builder AS builder
 RUN  --mount=type=cache,target=/go/pkg/mod \
      --mount=type=cache,target=/root/.cache/go-build \
      xcaddy build \
-     --with github.com/mholt/caddy-ratelimit \
      --with github.com/caddyserver/cache-handler \
      --with github.com/darkweak/storages/nuts/caddy \
-     --with github.com/darkweak/storages/redis/caddy
+     --with github.com/mohammed90/caddy-throttle-listener
 
 FROM busybox:1.36.1-uclibc AS staging
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
