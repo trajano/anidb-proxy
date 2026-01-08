@@ -1,30 +1,34 @@
 {
 	admin off
 	cache {
-		status 2xx
 		ttl 27h
-		mode bypass
 		default_cache_control public, max-age=86400
 		key {
 			disable_scheme
+			disable_host
 		}
 		nuts {
 			configuration {
 				Dir /data/nuts
 				EntryIdxMode 1
-				RWMode 0
-				SegmentSize 1024
 				NodeNum 42
-				SyncEnable true
-				StartFileLoadingMode 1
+				EnableHintFile true
+				EnableMergeV2 true
 			}
 		}
 	}
 }
 
 :80
+log {
+	output stdout
+	format json
+}
 @tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
-encode
+@compressible {
+	not path *.gz
+}
+encode @compressible 
 
 @anime_titles {
 	method GET HEAD
@@ -52,6 +56,8 @@ handle @anime_titles {
 		header_down -Cross-Origin-Resource-Policy
 		header_down -Link
 	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
 }
 
 @anidbhttp {
@@ -78,6 +84,8 @@ handle @anidbhttp {
 		header_down -Cross-Origin-Resource-Policy
 		header_down -Link
 	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
 }
 
 @images {
@@ -105,6 +113,8 @@ handle @images {
 		header_down -Cross-Origin-Resource-Policy
 		header_down -Link
 	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
 }
 
 @search {
@@ -135,28 +145,8 @@ handle @search {
 		header_down -Cross-Origin-Resource-Policy
 		header_down -Link
 	}
-}
-
-# Debug endpoint, to check if any private information gets leaked
-@debug {
-	method GET
-	path /debug
-}
-handle @debug {
-	rewrite * /get
-	reverse_proxy https://httpbin.org {
-		header_up Host {upstream_hostport}
-		header_up -X-Forwarded-For
-		header_up -X-Forwarded-Host
-		header_up -X-Forwarded-Proto
-		header_up Accept-Encoding identity
-		header_down -Cache-Control
-		header_down -Report-To
-		header_down -Content-Security-Policy-Report-Only
-		header_down -Cross-Origin-Opener-Policy
-		header_down -Cross-Origin-Resource-Policy
-		header_down -Link
-	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
 }
 
 respond / 204
