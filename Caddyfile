@@ -1,6 +1,7 @@
 {
 	admin off
 	cache {
+		status 2xx
 		ttl 27h
 		mode bypass
 		default_cache_control public, max-age=86400
