@@ -5,7 +5,7 @@ This is a simple caching proxy for AniDB to prevent the rate limits by ensuring 
 
 * `/api/anime-titles.dat.gz` maps to https://anidb.net/api/anime-titles.dat.gz
 * `/api/anime-titles.xml.gz` maps to https://anidb.net/api/anime-titles.xml.gz
-* `/httpapi` maps to http://api.anidb.net/httpapi
+* `/httpapi` maps to http://api.anidb.net:9001/httpapi
 * `/images/main/*` maps to https://cdn.anidb.net/images/main/
 
 Additional mappings provided against `/httpapi/` so it will be a single root.
