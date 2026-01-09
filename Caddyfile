@@ -67,6 +67,9 @@ handle @anime_titles {
 @anidbhttp {
 	method GET
 	path /httpapi
+	not {
+		expression {query.request} == "anime" && {query.aid}.matches("^\\d+$")
+	}
 }
 handle @anidbhttp {
 	handle @tracingEnabled
@@ -75,6 +78,52 @@ handle @anidbhttp {
 	}
 
 	cache
+	min_duration {
+		# prevent flooding of multiple upstream requests
+		duration 2s
+	}
+	error_body_status {
+		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
+		prefix `<error`
+		# the API spec actually says it returns 200 status code regardless of errors.
+		status 200
+		# status 500
+		max_bytes 256
+	}
+
+	reverse_proxy http://api.anidb.net:9001 {
+		header_up Host {upstream_hostport}
+		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		header_up Accept-Encoding identity
+		header_down -Cache-Control
+		header_down -Report-To
+		header_down -Content-Security-Policy-Report-Only
+		header_down -Cross-Origin-Opener-Policy
+		header_down -Cross-Origin-Resource-Policy
+		header_down -Link
+	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
+}
+
+@anidbhttpAnime {
+	method GET
+	path /httpapi
+	expression {query.request} == "anime" && {query.aid}.matches("^\\d+$")
+}
+handle @anidbhttpAnime {
+	handle @tracingEnabled
+	tracing {
+		span {path}
+	}
+	cache {
+		key {
+			template "anime-{query.aid}"
+		}
+	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
 		duration 2s
