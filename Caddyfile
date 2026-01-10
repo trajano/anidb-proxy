@@ -126,7 +126,7 @@ handle @anidbhttpAnime {
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
-		duration 2s
+		duration 30s
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
