@@ -3,6 +3,7 @@
 	# order decode_gzip before respond
 	order min_duration before respond
 	order error_body_status before respond
+	order cache before min_duration
 	cache {
 		ttl 27h
 		default_cache_control public, max-age=86400

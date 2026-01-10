@@ -28,7 +28,7 @@ func (h *recordingHandler) ServeHTTP(http.ResponseWriter, *http.Request) error {
 
 func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 	minDuration := 80 * time.Millisecond
-	handler := MinDurationHandler{Duration: caddy.Duration(minDuration)}
+	handler := MinDurationHandler{Duration: caddy.Duration(minDuration), JitterPercent: 0}
 
 	starts := make(chan time.Time, 2)
 	releaseFirst := make(chan struct{})
@@ -43,16 +43,15 @@ func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req2 := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 
-	done1 := make(chan time.Time, 1)
 	err1 := make(chan error, 1)
 	go func() {
 		err := handler.ServeHTTP(httptest.NewRecorder(), req1, caddyhttp.HandlerFunc(next.ServeHTTP))
 		err1 <- err
-		done1 <- time.Now()
 	}()
 
+	var start1 time.Time
 	select {
-	case <-starts:
+	case start1 = <-starts:
 	case <-time.After(1 * time.Second):
 		t.Fatal("timeout waiting for first request to reach upstream")
 	}
@@ -64,17 +63,8 @@ func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 
 	select {
 	case <-starts:
-		t.Fatal("second request reached upstream before first completed")
-	case <-time.After(20 * time.Millisecond):
-	}
-
-	close(releaseFirst)
-
-	var doneAt time.Time
-	select {
-	case doneAt = <-done1:
-	case <-time.After(1 * time.Second):
-		t.Fatal("timeout waiting for first request to complete")
+		t.Fatal("second request reached upstream before min duration elapsed")
+	case <-time.After(minDuration / 2):
 	}
 
 	var start2 time.Time
@@ -83,6 +73,8 @@ func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatal("timeout waiting for second request to reach upstream")
 	}
+
+	close(releaseFirst)
 
 	select {
 	case err := <-err1:
@@ -102,7 +94,7 @@ func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 		t.Fatal("timeout waiting for second request error")
 	}
 
-	if gap := start2.Sub(doneAt); gap < minDuration {
-		t.Fatalf("expected at least %v between completion and next upstream call, got %v", minDuration, gap)
+	if gap := start2.Sub(start1); gap < minDuration {
+		t.Fatalf("expected at least %v between upstream calls, got %v", minDuration, gap)
 	}
 }

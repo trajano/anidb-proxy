@@ -2,7 +2,9 @@ package errorbodystatus
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,9 +20,10 @@ func init() {
 }
 
 type MinDurationHandler struct {
-	Duration caddy.Duration `json:"duration,omitempty"`
-	mu       sync.Mutex
-	last     time.Time
+	Duration      caddy.Duration `json:"duration,omitempty"`
+	JitterPercent float64        `json:"jitter_percent,omitempty"`
+	mu            sync.Mutex
+	last          time.Time
 }
 
 func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
@@ -35,16 +38,15 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 	if minDuration <= 0 {
 		minDuration = 2 * time.Second
 	}
+	jitterPercent := h.JitterPercent
+	if jitterPercent <= 0 {
+		jitterPercent = 1
+	}
 
-	h.mu.Lock()
-	if err := h.waitForSlotLocked(r.Context(), minDuration); err != nil {
-		h.mu.Unlock()
+	if err := h.waitForSlot(r.Context(), minDuration, jitterPercent); err != nil {
 		return err
 	}
-	err := next.ServeHTTP(w, r)
-	h.last = time.Now()
-	h.mu.Unlock()
-	return err
+	return next.ServeHTTP(w, r)
 }
 
 func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -60,6 +62,18 @@ func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("duration must be a valid duration: %v", err)
 				}
 				h.Duration = caddy.Duration(parsed)
+			case "jitter_percent":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				parsed, err := strconv.ParseFloat(d.Val(), 64)
+				if err != nil {
+					return d.Errf("jitter_percent must be a valid number: %v", err)
+				}
+				if parsed < 0 {
+					return d.Err("jitter_percent must be non-negative")
+				}
+				h.JitterPercent = parsed
 			default:
 				return d.Errf("unknown option: %s", d.Val())
 			}
@@ -76,21 +90,26 @@ func parseMinDurationCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHand
 	return &handler, nil
 }
 
-func (h *MinDurationHandler) waitForSlotLocked(ctx context.Context, minDuration time.Duration) error {
-	if h.last.IsZero() {
-		return nil
-	}
-	wait := h.last.Add(minDuration).Sub(time.Now())
-	if wait <= 0 {
-		return nil
-	}
+func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.Duration, jitterPercent float64) error {
+	for {
+		h.mu.Lock()
+		now := time.Now()
+		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
+			h.last = now
+			h.mu.Unlock()
+			return nil
+		}
+		wait := h.last.Add(minDuration).Sub(now)
+		h.mu.Unlock()
 
-	timer := time.NewTimer(wait)
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		timer.Stop()
-		return ctx.Err()
+		jitter := time.Duration(float64(minDuration) * (jitterPercent / 100) * rand.Float64())
+		timer := time.NewTimer(wait + jitter)
+		select {
+		case <-timer.C:
+			// Re-check against the updated last time.
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		}
 	}
 }
