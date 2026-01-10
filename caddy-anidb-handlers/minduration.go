@@ -36,10 +36,15 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 		minDuration = 2 * time.Second
 	}
 
-	if err := h.waitForSlot(r.Context(), minDuration); err != nil {
+	h.mu.Lock()
+	if err := h.waitForSlotLocked(r.Context(), minDuration); err != nil {
+		h.mu.Unlock()
 		return err
 	}
-	return next.ServeHTTP(w, r)
+	err := next.ServeHTTP(w, r)
+	h.last = time.Now()
+	h.mu.Unlock()
+	return err
 }
 
 func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -71,25 +76,21 @@ func parseMinDurationCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHand
 	return &handler, nil
 }
 
-func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.Duration) error {
-	for {
-		h.mu.Lock()
-		now := time.Now()
-		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
-			h.last = now
-			h.mu.Unlock()
-			return nil
-		}
-		wait := h.last.Add(minDuration).Sub(now)
-		h.mu.Unlock()
+func (h *MinDurationHandler) waitForSlotLocked(ctx context.Context, minDuration time.Duration) error {
+	if h.last.IsZero() {
+		return nil
+	}
+	wait := h.last.Add(minDuration).Sub(time.Now())
+	if wait <= 0 {
+		return nil
+	}
 
-		timer := time.NewTimer(wait)
-		select {
-		case <-timer.C:
-			// Loop to re-check against the updated last time.
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		}
+	timer := time.NewTimer(wait)
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
 	}
 }
