@@ -9,7 +9,7 @@
 		default_cache_control public, max-age=86400
 		timeout {
           backend 30s
-          cache 5ms
+          cache 1s
         }
 		key {
 			disable_scheme
