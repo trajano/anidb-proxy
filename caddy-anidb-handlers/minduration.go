@@ -121,44 +121,14 @@ func parseMinDurationCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHand
 	return &handler, nil
 }
 
-func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.Duration, jitterFactor float64) error {
-	// legacy wait, kept for compatibility
-	for {
-		if h.mu == nil {
-			h.mu = &sync.Mutex{}
-		}
-		h.mu.Lock()
-		now := time.Now()
-		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
-			h.last = now
-			h.mu.Unlock()
-			return nil
-		}
-		wait := h.last.Add(minDuration).Sub(now)
-		h.mu.Unlock()
-
-		jitter := time.Duration(float64(minDuration) * jitterFactor * rand.Float64())
-		timer := time.NewTimer(wait + jitter)
-		select {
-		case <-timer.C:
-			// Re-check against the updated last time.
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		}
-	}
-}
-
 func (h *MinDurationHandler) waitForSlotOrRespond(w http.ResponseWriter, r *http.Request, ctx context.Context, minDuration time.Duration, jitterFactor float64, threshold time.Duration, mode string) (bool, error) {
 	for {
-		if h.mu == nil {
-			h.mu = &sync.Mutex{}
-		}
 		h.mu.Lock()
 		now := time.Now()
 		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
 			h.last = now
 			h.mu.Unlock()
+			// Basically not handling the request so just return false and let the caller serve it normally.
 			return false, nil
 		}
 		wait := h.last.Add(minDuration).Sub(now)
@@ -166,29 +136,36 @@ func (h *MinDurationHandler) waitForSlotOrRespond(w http.ResponseWriter, r *http
 
 		jitter := time.Duration(float64(minDuration) * jitterFactor * rand.Float64())
 		totalWait := wait + jitter
-		if threshold > 0 && totalWait > threshold {
-			// exceed threshold: respond immediately
-			switch mode {
-			case "redirect", "":
-				// Temporary redirect; preserve method
-				http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
-				return true, nil
-			case "retry-after":
-				secs := int(math.Ceil(totalWait.Seconds()))
-				w.Header().Set("Retry-After", strconv.Itoa(secs))
-				w.WriteHeader(http.StatusServiceUnavailable)
-				return true, nil
-			default:
-				// unknown mode: default to redirect
-				http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
-				return true, nil
+		if mode == "retry-after" {
+			secs := int(math.Ceil(totalWait.Seconds()))
+			if secs < 0 {
+				secs = 0
 			}
+			w.Header().Set("Retry-After", strconv.Itoa(secs))
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return true, nil
 		}
 
-		timer := time.NewTimer(totalWait)
+		waitDuration := totalWait
+		if threshold > 0 && waitDuration > threshold {
+			waitDuration = threshold
+		}
+		if waitDuration <= 0 {
+			if mode == "wait" {
+				continue
+			}
+			http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+			return true, nil
+		}
+
+		timer := time.NewTimer(waitDuration)
 		select {
 		case <-timer.C:
-			// Re-check against updated last time
+			if mode == "wait" {
+				continue
+			}
+			http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+			return true, nil
 		case <-ctx.Done():
 			timer.Stop()
 			return false, ctx.Err()

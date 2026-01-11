@@ -35,6 +35,12 @@ services:
       - HTTPAPI_MIN_DURATION_JITTER=0.01
 ```
 
+The `min_duration` handler also supports optional Caddyfile settings:
+- `wait_threshold` (default: `5s`) — maximum delay before the handler responds or proceeds.
+- `wait_mode` (default: `redirect`) — `redirect`, `retry-after`, or `wait`.
+
+Note: when `wait_mode` is set to `wait`, two requests for the same ID can both reach the upstream and the second request will not leverage the cache.
+
 Additional mappings provided against `/httpapi/` so it will be a single root.
 * `/httpapi/anime-titles.dat.gz` maps to https://anidb.net/api/anime-titles.dat.gz
 * `/httpapi/anime-titles.xml.gz` maps to https://anidb.net/api/anime-titles.xml.gz
