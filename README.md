@@ -16,6 +16,8 @@ The `/httpapi` route applies two extra behaviors:
 * If the first bytes of the response (after gzip decoding) contain `<error`, the proxy sets `Cache-Control: no-store` to avoid caching error responses.
 * `request=anime` only keys against `aid` and drops the other query parameters for the key
 
+You can override the `/httpapi` backend timeout and rate-limit window using `HTTPAPI_BACKEND_DURATION` (default: `3s`). This value is used for both the cache backend timeout and `min_duration`.
+
 Additional mappings provided against `/httpapi/` so it will be a single root.
 * `/httpapi/anime-titles.dat.gz` maps to https://anidb.net/api/anime-titles.dat.gz
 * `/httpapi/anime-titles.xml.gz` maps to https://anidb.net/api/anime-titles.xml.gz
