@@ -20,10 +20,10 @@ func init() {
 }
 
 type MinDurationHandler struct {
-	Duration      caddy.Duration `json:"duration,omitempty"`
-	JitterFactor  float64        `json:"jitter_factor,omitempty"`
-	mu            *sync.Mutex
-	last          time.Time
+	Duration     caddy.Duration `json:"duration,omitempty"`
+	JitterFactor float64        `json:"jitter_factor,omitempty"`
+	mu           *sync.Mutex
+	last         time.Time
 }
 
 func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {

@@ -16,13 +16,23 @@ The `/httpapi` route applies two extra behaviors:
 * If the first bytes of the response (after gzip decoding) contain `<error`, the proxy sets `Cache-Control: no-store` to avoid caching error responses.
 * `request=anime` only keys against `aid` and drops the other query parameters for the key
 
-You can override the `/httpapi` backend timeout and rate-limit window using the environment variable `HTTPAPI_BACKEND_DURATION` (default: `3s`). This value is used for both the cache backend timeout and the `min_duration` handler.
+You can configure two environment variables:
 
-Optionally, set a jitter factor (a small fractional random delay applied to `min_duration`) via the environment variable `MIN_DURATION_JITTER` (default: `0.01`). Example (PowerShell):
+- `HTTPAPI_MIN_DURATION` (default: `3s`) — the minimum spacing between upstream calls enforced by the `min_duration` handler.
+- `HTTPAPI_BACKEND_TIMEOUT` (default: `300s`) — the cache backend timeout used for upstream backend requests.
 
-```powershell
-setx HTTPAPI_BACKEND_DURATION "3s"
-setx MIN_DURATION_JITTER "0.01"
+Important: `HTTPAPI_BACKEND_TIMEOUT` must be at least as large as `HTTPAPI_MIN_DURATION`, and in practice should be larger because multiple requests may queue behind the first and each queued request increases the time the backend needs to serve them. A recommended tuning starting point is to set `HTTPAPI_BACKEND_TIMEOUT` to 100× `HTTPAPI_MIN_DURATION`.
+
+Optionally, set a jitter factor (a small fractional random delay applied to `min_duration`) via the environment variable `HTTPAPI_MIN_DURATION_JITTER` (default: `0.01`). Example (docker-compose):
+
+```yaml
+services:
+  anidb-proxy:
+    image: ghcr.io/trajano/anidb-proxy:latest
+    environment:
+      - HTTPAPI_MIN_DURATION=3s
+      - HTTPAPI_BACKEND_TIMEOUT=300s
+      - HTTPAPI_MIN_DURATION_JITTER=0.01
 ```
 
 Additional mappings provided against `/httpapi/` so it will be a single root.
