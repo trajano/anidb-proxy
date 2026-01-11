@@ -13,6 +13,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -63,7 +64,7 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 		// we already wrote a response (redirect or retry-after)
 		return nil
 	}
-	caddy.Log().Info("sending request to next handler")
+	caddy.Log().Info("sending request to next handler", zap.String("url", r.URL.String()))
 	return next.ServeHTTP(w, r)
 }
 

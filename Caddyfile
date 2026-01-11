@@ -15,6 +15,7 @@
 		nuts {
 			path /cache
 			configuration {
+				SyncEnable true
 			}
 		}
 		# Simplefs is not used because it does support cache reload on startup
