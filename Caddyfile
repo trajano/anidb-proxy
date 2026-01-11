@@ -13,8 +13,9 @@
 		}
 		log_level debug
 		nuts {
-			path /cache
+			path {$CACHE_DIR:/cache}
 			configuration {
+				Dir {$CACHE_DIR:/cache}
 				SyncEnable true
 			}
 		}
