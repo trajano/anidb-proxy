@@ -63,6 +63,7 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 		// we already wrote a response (redirect or retry-after)
 		return nil
 	}
+	caddy.Log().Info("sending request to next handler")
 	return next.ServeHTTP(w, r)
 }
 
