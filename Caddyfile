@@ -7,10 +7,6 @@
 	cache {
 		ttl 27h
 		default_cache_control public, max-age=86400
-		timeout {
-          backend 30s
-          cache 1s
-        }
 		key {
 			disable_scheme
 			disable_host
@@ -82,10 +78,15 @@ handle @anidbhttp {
 		span {path}
 	}
 
-	cache
+	cache {
+		timeout {
+			backend {env.HTTPAPI_BACKEND_DURATION:3s}
+			cache 1s
+		}
+	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
-		duration 30s
+		duration {env.HTTPAPI_BACKEND_DURATION:3s}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
@@ -125,13 +126,17 @@ handle @anidbhttpAnime {
 		span {path}
 	}
 	cache {
+		timeout {
+			backend {env.HTTPAPI_BACKEND_DURATION:3s}
+			cache 1s
+		}
 		key {
 			template "anime-{query.aid}"
 		}
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
-		duration 30s
+		duration {env.HTTPAPI_BACKEND_DURATION:3s}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
