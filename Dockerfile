@@ -7,6 +7,7 @@ RUN  --mount=type=cache,target=/go/pkg/mod \
      xcaddy build \
      --with github.com/trajano/anidb-proxy/caddy-anidb-handlers=/caddy-anidb-handlers \
      --with github.com/caddyserver/cache-handler@v0.16.0 \
+     --with github.com/darkweak/storages/nuts/caddy@v0.0.16 \
      --with github.com/darkweak/storages/simplefs/caddy@v0.0.16
 
 FROM busybox:1.36.1-uclibc AS staging

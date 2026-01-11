@@ -12,13 +12,17 @@
 			disable_vary
 		}
 		log_level debug
-		# Simplefs is chosen for simplicity and ease of debug at the expense of size.
-		simplefs {
+		nuts {
 			path /cache
 			configuration {
 			}
 		}
-		disable_surrogate_key
+		# Simplefs is not used because it does support cache reload on startup
+		# simplefs {
+		# 	path /cache
+		# 	configuration {
+		# 	}
+		# }
 	}
 }
 
