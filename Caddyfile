@@ -136,6 +136,7 @@ handle @anidbhttpAnime {
 		key {
 			template "anime-{query.aid}"
 		}
+		disable_surrogate_key
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
