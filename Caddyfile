@@ -1,6 +1,5 @@
 {
 	admin off
-	# order decode_gzip before respond
 	order min_duration before respond
 	order error_body_status before respond
 	order cache before min_duration
@@ -19,6 +18,7 @@
 			configuration {
 			}
 		}
+		disable_surrogate_key
 	}
 }
 
@@ -136,7 +136,6 @@ handle @anidbhttpAnime {
 		key {
 			template "anime-{query.aid}"
 		}
-		disable_surrogate_key
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests

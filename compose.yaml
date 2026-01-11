@@ -3,7 +3,7 @@ services:
     build:
       context: .
     volumes:
-      - anidb-proxy-data:/data/nuts
+      - anidb-proxy-data:/cache
     ports:
       - ${ANIDB_PROXY_PORT:-}:80
 volumes:
