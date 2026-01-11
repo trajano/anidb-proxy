@@ -28,7 +28,7 @@ func (h *recordingHandler) ServeHTTP(http.ResponseWriter, *http.Request) error {
 
 func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 	minDuration := 80 * time.Millisecond
-	handler := MinDurationHandler{Duration: caddy.Duration(minDuration), JitterPercent: 0}
+	handler := MinDurationHandler{Duration: caddy.Duration(minDuration), JitterFactor: 0}
 
 	starts := make(chan time.Time, 2)
 	releaseFirst := make(chan struct{})

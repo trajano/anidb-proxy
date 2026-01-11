@@ -86,7 +86,10 @@ handle @anidbhttp {
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
+		# duration is sourced from environment: HTTPAPI_BACKEND_DURATION (default 3s)
 		duration {env.HTTPAPI_BACKEND_DURATION:3s}
+		# optional: jitter factor (fraction of duration) via MIN_DURATION_JITTER (default 0.01)
+		jitter_factor {env.MIN_DURATION_JITTER:0.01}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
@@ -136,7 +139,10 @@ handle @anidbhttpAnime {
 	}
 	min_duration {
 		# prevent flooding of multiple upstream requests
+		# duration is sourced from environment: HTTPAPI_BACKEND_DURATION (default 3s)
 		duration {env.HTTPAPI_BACKEND_DURATION:3s}
+		# optional: jitter factor (fraction of duration) via MIN_DURATION_JITTER (default 0.01)
+		jitter_factor {env.MIN_DURATION_JITTER:0.01}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.

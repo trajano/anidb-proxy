@@ -16,7 +16,14 @@ The `/httpapi` route applies two extra behaviors:
 * If the first bytes of the response (after gzip decoding) contain `<error`, the proxy sets `Cache-Control: no-store` to avoid caching error responses.
 * `request=anime` only keys against `aid` and drops the other query parameters for the key
 
-You can override the `/httpapi` backend timeout and rate-limit window using `HTTPAPI_BACKEND_DURATION` (default: `3s`). This value is used for both the cache backend timeout and `min_duration`.
+You can override the `/httpapi` backend timeout and rate-limit window using the environment variable `HTTPAPI_BACKEND_DURATION` (default: `3s`). This value is used for both the cache backend timeout and the `min_duration` handler.
+
+Optionally, set a jitter factor (a small fractional random delay applied to `min_duration`) via the environment variable `MIN_DURATION_JITTER` (default: `0.01`). Example (PowerShell):
+
+```powershell
+setx HTTPAPI_BACKEND_DURATION "3s"
+setx MIN_DURATION_JITTER "0.01"
+```
 
 Additional mappings provided against `/httpapi/` so it will be a single root.
 * `/httpapi/anime-titles.dat.gz` maps to https://anidb.net/api/anime-titles.dat.gz
