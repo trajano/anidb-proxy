@@ -2,6 +2,7 @@ package errorbodystatus
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -20,10 +21,12 @@ func init() {
 }
 
 type MinDurationHandler struct {
-	Duration     caddy.Duration `json:"duration,omitempty"`
-	JitterFactor float64        `json:"jitter_factor,omitempty"`
-	mu           *sync.Mutex
-	last         time.Time
+	Duration      caddy.Duration `json:"duration,omitempty"`
+	JitterFactor  float64        `json:"jitter_factor,omitempty"`
+	WaitThreshold caddy.Duration `json:"wait_threshold,omitempty"`
+	WaitMode      string         `json:"wait_mode,omitempty"`
+	mu            *sync.Mutex
+	last          time.Time
 }
 
 func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
@@ -43,8 +46,22 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 		jitterFactor = 0.01
 	}
 
-	if err := h.waitForSlot(r.Context(), minDuration, jitterFactor); err != nil {
+	threshold := time.Duration(h.WaitThreshold)
+	if threshold <= 0 {
+		threshold = 5 * time.Second
+	}
+	mode := h.WaitMode
+	if mode == "" {
+		mode = "redirect"
+	}
+
+	handled, err := h.waitForSlotOrRespond(w, r, r.Context(), minDuration, jitterFactor, threshold, mode)
+	if err != nil {
 		return err
+	}
+	if handled {
+		// we already wrote a response (redirect or retry-after)
+		return nil
 	}
 	return next.ServeHTTP(w, r)
 }
@@ -74,6 +91,20 @@ func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Err("jitter_factor must be non-negative")
 				}
 				h.JitterFactor = parsed
+			case "wait_threshold":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				parsed, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("wait_threshold must be a valid duration: %v", err)
+				}
+				h.WaitThreshold = caddy.Duration(parsed)
+			case "wait_mode":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				h.WaitMode = d.Val()
 			default:
 				return d.Errf("unknown option: %s", d.Val())
 			}
@@ -91,6 +122,7 @@ func parseMinDurationCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHand
 }
 
 func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.Duration, jitterFactor float64) error {
+	// legacy wait, kept for compatibility
 	for {
 		if h.mu == nil {
 			h.mu = &sync.Mutex{}
@@ -113,6 +145,53 @@ func (h *MinDurationHandler) waitForSlot(ctx context.Context, minDuration time.D
 		case <-ctx.Done():
 			timer.Stop()
 			return ctx.Err()
+		}
+	}
+}
+
+func (h *MinDurationHandler) waitForSlotOrRespond(w http.ResponseWriter, r *http.Request, ctx context.Context, minDuration time.Duration, jitterFactor float64, threshold time.Duration, mode string) (bool, error) {
+	for {
+		if h.mu == nil {
+			h.mu = &sync.Mutex{}
+		}
+		h.mu.Lock()
+		now := time.Now()
+		if h.last.IsZero() || now.Sub(h.last) >= minDuration {
+			h.last = now
+			h.mu.Unlock()
+			return false, nil
+		}
+		wait := h.last.Add(minDuration).Sub(now)
+		h.mu.Unlock()
+
+		jitter := time.Duration(float64(minDuration) * jitterFactor * rand.Float64())
+		totalWait := wait + jitter
+		if threshold > 0 && totalWait > threshold {
+			// exceed threshold: respond immediately
+			switch mode {
+			case "redirect", "":
+				// Temporary redirect; preserve method
+				http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+				return true, nil
+			case "retry-after":
+				secs := int(math.Ceil(totalWait.Seconds()))
+				w.Header().Set("Retry-After", strconv.Itoa(secs))
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return true, nil
+			default:
+				// unknown mode: default to redirect
+				http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+				return true, nil
+			}
+		}
+
+		timer := time.NewTimer(totalWait)
+		select {
+		case <-timer.C:
+			// Re-check against updated last time
+		case <-ctx.Done():
+			timer.Stop()
+			return false, ctx.Err()
 		}
 	}
 }
