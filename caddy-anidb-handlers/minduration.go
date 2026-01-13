@@ -157,6 +157,7 @@ func (h *MinDurationHandler) waitForSlotOrRespond(w http.ResponseWriter, r *http
 				continue
 			}
 			http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+			time.Sleep(time.Second)
 			return true, nil
 		}
 
@@ -167,6 +168,7 @@ func (h *MinDurationHandler) waitForSlotOrRespond(w http.ResponseWriter, r *http
 				continue
 			}
 			http.Redirect(w, r, r.URL.String(), http.StatusTemporaryRedirect)
+			time.Sleep(time.Second)
 			return true, nil
 		case <-ctx.Done():
 			timer.Stop()
