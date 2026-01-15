@@ -23,6 +23,7 @@ func init() {
 
 type Handler struct {
 	Prefix   string `json:"prefix,omitempty"`
+	NotFoundMessage   string `json:"not_found_message,omitempty"`
 	Status   int    `json:"status,omitempty"`
 	MaxBytes int    `json:"max_bytes,omitempty"`
 }
@@ -38,6 +39,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	prefix := []byte(h.Prefix)
 	if len(prefix) == 0 {
 		prefix = []byte(`<error code="500">`)
+	}
+	notFoundMessage := []byte(h.NotFoundMessage)
+	if len(notFoundMessage) == 0 {
+		prefix = []byte(`<error>Anime not found</error>`)
 	}
 
 	status := h.Status
@@ -56,6 +61,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	bw := &bufferingWriter{
 		ResponseWriter: w,
 		prefix:         prefix,
+		notFoundMessage:         notFoundMessage,
 		status:         status,
 		maxBytes:       maxBytes,
 	}
@@ -114,6 +120,7 @@ type bufferingWriter struct {
 	http.ResponseWriter
 
 	prefix   []byte
+	notFoundMessage   []byte
 	status   int
 	maxBytes int
 
@@ -146,9 +153,12 @@ func (bw *bufferingWriter) Write(p []byte) (int, error) {
 
 	if bw.buf.Len() >= bw.maxBytes {
 		bw.decided = true
-		if bw.matchesErrorPrefix() {
+		matchesError, matchesNotFound := bw.matchBodyTokens()
+		if matchesError {
 			bw.code = bw.status
-			bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+			if !matchesNotFound {
+				bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+			}
 		}
 		bw.streamed = true
 		bw.writeHeaderIfNeeded()
@@ -167,9 +177,12 @@ func (bw *bufferingWriter) Flush() {
 	}
 	if !bw.decided {
 		bw.decided = true
-		if bw.matchesErrorPrefix() {
+		matchesError, matchesNotFound := bw.matchBodyTokens()
+		if matchesError {
 			bw.code = bw.status
-			bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+			if !matchesNotFound {
+				bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+			}
 		}
 		bw.streamed = true
 		bw.writeHeaderIfNeeded()
@@ -216,9 +229,12 @@ func (bw *bufferingWriter) flushIfNeeded() {
 		return
 	}
 
-	if bw.matchesErrorPrefix() {
+	matchesError, matchesNotFound := bw.matchBodyTokens()
+	if matchesError {
 		bw.code = bw.status
-		bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+		if !matchesNotFound {
+			bw.ResponseWriter.Header().Set("Cache-Control", "no-store")
+		}
 	}
 
 	if !bw.wroteHeader {
@@ -235,10 +251,7 @@ func (bw *bufferingWriter) flushIfNeeded() {
 	bw.decided = true
 }
 
-func (bw *bufferingWriter) matchesErrorPrefix() bool {
-	if len(bw.prefix) == 0 {
-		return false
-	}
+func (bw *bufferingWriter) matchBodyTokens() (bool, bool) {
 	payload := bw.buf.Bytes()
 	if bw.isGzipEncoded() {
 		decoded, err := bw.decodeGzip(payload, bw.maxBytes)
@@ -246,14 +259,15 @@ func (bw *bufferingWriter) matchesErrorPrefix() bool {
 			payload = decoded
 		}
 	}
-	limit := len(payload)
-	if limit > bw.maxBytes {
-		limit = bw.maxBytes
+	if len(payload) > bw.maxBytes {
+		payload = payload[:bw.maxBytes]
 	}
-	if limit <= 0 {
-		return false
+	if len(payload) == 0 {
+		return false, false
 	}
-	return bytes.Contains(payload[:limit], bw.prefix)
+	matchesError := len(bw.prefix) > 0 && bytes.Contains(payload, bw.prefix)
+	matchesNotFound := len(bw.notFoundMessage) > 0 && bytes.Contains(payload, bw.notFoundMessage)
+	return matchesError, matchesNotFound
 }
 
 func (bw *bufferingWriter) isGzipEncoded() bool {

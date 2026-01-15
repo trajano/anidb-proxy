@@ -3,6 +3,7 @@ package errorbodystatus
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func (h *recordingHandler) ServeHTTP(http.ResponseWriter, *http.Request) error {
 
 func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 	minDuration := 80 * time.Millisecond
-	handler := MinDurationHandler{Duration: caddy.Duration(minDuration), JitterFactor: 0}
+	handler := MinDurationHandler{Duration: caddy.Duration(minDuration), JitterFactor: 0, WaitMode: "wait", mu: &sync.Mutex{}}
 
 	starts := make(chan time.Time, 2)
 	releaseFirst := make(chan struct{})
@@ -96,5 +97,39 @@ func TestMinDurationHandler_WaitsAfterCompletion(t *testing.T) {
 
 	if gap := start2.Sub(start1); gap < minDuration {
 		t.Fatalf("expected at least %v between upstream calls, got %v", minDuration, gap)
+	}
+}
+
+func TestMinDurationHandler_RedirectsWhenBusy(t *testing.T) {
+	minDuration := 50 * time.Millisecond
+	handler := MinDurationHandler{
+		Duration:      caddy.Duration(minDuration),
+		JitterFactor:  0,
+		WaitThreshold: caddy.Duration(5 * time.Millisecond),
+		WaitMode:      "redirect",
+		mu:            &sync.Mutex{},
+		last:          time.Now(),
+	}
+
+	var called int32
+	next := caddyhttp.HandlerFunc(func(http.ResponseWriter, *http.Request) error {
+		atomic.AddInt32(&called, 1)
+		return nil
+	})
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err := handler.ServeHTTP(recorder, req, next); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := recorder.Code; got != http.StatusTemporaryRedirect {
+		t.Fatalf("expected status %d, got %d", http.StatusTemporaryRedirect, got)
+	}
+	if location := recorder.Header().Get("Location"); location != req.URL.String() {
+		t.Fatalf("expected redirect location %q, got %q", req.URL.String(), location)
+	}
+	if atomic.LoadInt32(&called) != 0 {
+		t.Fatalf("expected upstream not to be called")
 	}
 }
