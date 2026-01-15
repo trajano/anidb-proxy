@@ -30,6 +30,7 @@ type MinDurationHandler struct {
 	last          time.Time
 }
 
+// CaddyModule returns the module information for Caddy.
 func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.min_duration",
@@ -37,6 +38,7 @@ func (MinDurationHandler) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+// ServeHTTP enforces a minimum duration between requests, optionally responding early.
 func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	minDuration := time.Duration(h.Duration)
 	if minDuration <= 0 {
@@ -68,6 +70,7 @@ func (h *MinDurationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, n
 	return next.ServeHTTP(w, r)
 }
 
+// UnmarshalCaddyfile configures the handler from Caddyfile tokens.
 func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {

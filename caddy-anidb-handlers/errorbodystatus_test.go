@@ -36,16 +36,17 @@ func TestBufferingWriterFlushErrorHandling(t *testing.T) {
 		bw := &bufferingWriter{
 			ResponseWriter:  recorder,
 			prefix:          []byte("ERR"),
-			notFoundMessage: []byte("NF"),
 			status:          http.StatusInternalServerError,
+			notFoundMessage: []byte("NF"),
+			notFoundStatus:  http.StatusNotFound,
 			maxBytes:        8,
 		}
-		payload := []byte("ERRNFxxx")
+		payload := []byte("NF")
 		bw.buf.Write(payload)
 		bw.Flush()
 
-		if recorder.Code != http.StatusInternalServerError {
-			t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, recorder.Code)
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf("expected status %d, got %d", http.StatusNotFound, recorder.Code)
 		}
 		if cacheControl := recorder.Header().Get("Cache-Control"); cacheControl == "no-store" {
 			t.Fatalf("expected Cache-Control to allow caching, got %q", cacheControl)

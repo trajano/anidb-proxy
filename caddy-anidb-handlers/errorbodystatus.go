@@ -22,10 +22,11 @@ func init() {
 }
 
 type Handler struct {
-	Prefix   string `json:"prefix,omitempty"`
-	NotFoundMessage   string `json:"not_found_message,omitempty"`
-	Status   int    `json:"status,omitempty"`
-	MaxBytes int    `json:"max_bytes,omitempty"`
+	Prefix          string `json:"prefix,omitempty"`
+	Status          int    `json:"status,omitempty"`
+	NotFoundMessage string `json:"not_found_message,omitempty"`
+	NotFoundStatus  int    `json:"not_found_status,omitempty"`
+	MaxBytes        int    `json:"max_bytes,omitempty"`
 }
 
 // CaddyModule returns the module information for Caddy.
@@ -51,6 +52,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
+	notFoundStatus := h.NotFoundStatus
+	if notFoundStatus == 0 {
+		notFoundStatus = http.StatusNotFound
+	}
 
 	maxBytes := h.MaxBytes
 	if maxBytes <= 0 {
@@ -61,11 +66,12 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	}
 
 	bw := &bufferingWriter{
-		ResponseWriter: w,
-		prefix:         prefix,
-		notFoundMessage:         notFoundMessage,
-		status:         status,
-		maxBytes:       maxBytes,
+		ResponseWriter:  w,
+		prefix:          prefix,
+		status:          status,
+		notFoundStatus:  notFoundStatus,
+		notFoundMessage: notFoundMessage,
+		maxBytes:        maxBytes,
 	}
 	err := next.ServeHTTP(bw, r)
 	if err != nil {
@@ -122,10 +128,11 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 type bufferingWriter struct {
 	http.ResponseWriter
 
-	prefix   []byte
-	notFoundMessage   []byte
-	status   int
-	maxBytes int
+	prefix          []byte
+	status          int
+	notFoundMessage []byte
+	notFoundStatus  int
+	maxBytes        int
 
 	code        int
 	wroteHeader bool
@@ -157,6 +164,9 @@ func (bw *bufferingWriter) Write(p []byte) (int, error) {
 	if bw.buf.Len() >= bw.maxBytes {
 		bw.decided = true
 		matchesError, matchesNotFound := bw.matchBodyTokens()
+		if matchesNotFound {
+			bw.code = bw.notFoundStatus
+		}
 		if matchesError {
 			bw.code = bw.status
 			if !matchesNotFound {
@@ -175,12 +185,18 @@ func (bw *bufferingWriter) Write(p []byte) (int, error) {
 
 func (bw *bufferingWriter) Flush() {
 	if !bw.decided && bw.buf.Len() < bw.maxBytes {
-		// Suppress streaming flushes so we can inspect the initial bytes.
-		return
+		matchesError, matchesNotFound := bw.matchBodyTokens()
+		if !matchesError && !matchesNotFound {
+			// Suppress streaming flushes so we can inspect the initial bytes.
+			return
+		}
 	}
 	if !bw.decided {
 		bw.decided = true
 		matchesError, matchesNotFound := bw.matchBodyTokens()
+		if matchesNotFound {
+			bw.code = bw.notFoundStatus
+		}
 		if matchesError {
 			bw.code = bw.status
 			if !matchesNotFound {
@@ -233,6 +249,9 @@ func (bw *bufferingWriter) flushIfNeeded() {
 	}
 
 	matchesError, matchesNotFound := bw.matchBodyTokens()
+	if matchesNotFound {
+		bw.code = bw.notFoundStatus
+	}
 	if matchesError {
 		bw.code = bw.status
 		if !matchesNotFound {
