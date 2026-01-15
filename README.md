@@ -1,5 +1,5 @@
 # AniDB proxy
-This is a caching proxy for AniDB to prevent the rate limits by ensuring requests are cached.  This is intended throttle the performance to prevent bans.
+This is a caching proxy for AniDB to prevent the rate limits by ensuring requests are cached.  This is intended throttle the performance to prevent bans.  Note there is still a chance you will get banned when you hit some daily limits not just because of rate of requests.
 
 ## Endpoints
 
