@@ -28,6 +28,7 @@ type Handler struct {
 	MaxBytes int    `json:"max_bytes,omitempty"`
 }
 
+// CaddyModule returns the module information for Caddy.
 func (Handler) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.error_body_status",
@@ -35,6 +36,7 @@ func (Handler) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+// ServeHTTP rewrites status codes when the response body matches the configured error prefix.
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	prefix := []byte(h.Prefix)
 	if len(prefix) == 0 {
@@ -73,6 +75,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	return nil
 }
 
+// UnmarshalCaddyfile configures the handler from Caddyfile tokens.
 func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
