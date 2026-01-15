@@ -87,40 +87,33 @@ func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		for d.NextBlock(0) {
 			switch d.Val() {
 			case "prefix":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				h.Prefix = d.Val()
-			case "not_found_message":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				h.NotFoundMessage = d.Val()
-			case "status":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				val, err := strconv.Atoi(d.Val())
+				val, err := parseStringArg(d, "prefix")
 				if err != nil {
-					return d.Errf("status must be an integer: %v", err)
+					return err
+				}
+				h.Prefix = val
+			case "not_found_message":
+				val, err := parseStringArg(d, "not_found_message")
+				if err != nil {
+					return err
+				}
+				h.NotFoundMessage = val
+			case "status":
+				val, err := parseIntArg(d, "status")
+				if err != nil {
+					return err
 				}
 				h.Status = val
 			case "not_found_status":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				val, err := strconv.Atoi(d.Val())
+				val, err := parseIntArg(d, "not_found_status")
 				if err != nil {
-					return d.Errf("not_found_status must be an integer: %v", err)
+					return err
 				}
 				h.NotFoundStatus = val
 			case "max_bytes":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				val, err := strconv.Atoi(d.Val())
+				val, err := parseIntArg(d, "max_bytes")
 				if err != nil {
-					return d.Errf("max_bytes must be an integer: %v", err)
+					return err
 				}
 				h.MaxBytes = val
 			default:

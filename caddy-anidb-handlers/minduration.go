@@ -76,40 +76,32 @@ func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		for d.NextBlock(0) {
 			switch d.Val() {
 			case "duration":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				parsed, err := caddy.ParseDuration(d.Val())
+				parsed, err := parseDurationArg(d, "duration")
 				if err != nil {
-					return d.Errf("duration must be a valid duration: %v", err)
+					return err
 				}
-				h.Duration = caddy.Duration(parsed)
+				h.Duration = parsed
 			case "jitter_factor":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				parsed, err := strconv.ParseFloat(d.Val(), 64)
+				parsed, err := parseFloatArg(d, "jitter_factor")
 				if err != nil {
-					return d.Errf("jitter_factor must be a valid number: %v", err)
+					return err
 				}
 				if parsed < 0 {
 					return d.Err("jitter_factor must be non-negative")
 				}
 				h.JitterFactor = parsed
 			case "wait_threshold":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				parsed, err := caddy.ParseDuration(d.Val())
+				parsed, err := parseDurationArg(d, "wait_threshold")
 				if err != nil {
-					return d.Errf("wait_threshold must be a valid duration: %v", err)
+					return err
 				}
-				h.WaitThreshold = caddy.Duration(parsed)
+				h.WaitThreshold = parsed
 			case "wait_mode":
-				if !d.NextArg() {
-					return d.ArgErr()
+				val, err := parseStringArg(d, "wait_mode")
+				if err != nil {
+					return err
 				}
-				h.WaitMode = d.Val()
+				h.WaitMode = val
 			default:
 				return d.Errf("unknown option: %s", d.Val())
 			}
