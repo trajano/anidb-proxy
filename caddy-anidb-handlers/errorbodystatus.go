@@ -91,6 +91,11 @@ func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				h.Prefix = d.Val()
+			case "not_found_message":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				h.NotFoundMessage = d.Val()
 			case "status":
 				if !d.NextArg() {
 					return d.ArgErr()
@@ -100,6 +105,15 @@ func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("status must be an integer: %v", err)
 				}
 				h.Status = val
+			case "not_found_status":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val, err := strconv.Atoi(d.Val())
+				if err != nil {
+					return d.Errf("not_found_status must be an integer: %v", err)
+				}
+				h.NotFoundStatus = val
 			case "max_bytes":
 				if !d.NextArg() {
 					return d.ArgErr()
