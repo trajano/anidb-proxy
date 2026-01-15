@@ -1,5 +1,6 @@
 {
-	admin off
+	# admin needs to be on for metrics
+	# admin off
 	order min_duration before respond
 	order error_body_status before respond
 	order cache before min_duration
