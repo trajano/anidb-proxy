@@ -97,7 +97,7 @@ func (h *MinDurationHandler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				h.WaitThreshold = parsed
 			case "wait_mode":
-				val, err := parseStringArg(d, "wait_mode")
+				val, err := parseKeywordArg(d, "wait_mode", "redirect", "retry-after", "wait")
 				if err != nil {
 					return err
 				}

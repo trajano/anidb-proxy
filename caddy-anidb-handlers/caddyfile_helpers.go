@@ -2,6 +2,7 @@ package errorbodystatus
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -12,6 +13,19 @@ func parseStringArg(d *caddyfile.Dispenser, name string) (string, error) {
 		return "", d.ArgErr()
 	}
 	return d.Val(), nil
+}
+
+func parseKeywordArg(d *caddyfile.Dispenser, name string, allowed ...string) (string, error) {
+	val, err := parseStringArg(d, name)
+	if err != nil {
+		return "", err
+	}
+	for _, candidate := range allowed {
+		if val == candidate {
+			return val, nil
+		}
+	}
+	return "", d.Errf("%s must be one of %s", name, strings.Join(allowed, ", "))
 }
 
 func parseIntArg(d *caddyfile.Dispenser, name string) (int, error) {

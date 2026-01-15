@@ -96,6 +96,8 @@ handle @anidbhttp {
 		duration {$HTTPAPI_MIN_DURATION:5s}
 		# optional: jitter factor (fraction of duration) via HTTPAPI_MIN_DURATION_JITTER (default 0.01)
 		jitter_factor {$HTTPAPI_MIN_DURATION_JITTER:0.01}
+		# This is the normal default.  Jellyfin does not handle "redirect" responses.
+		wait_mode {$HTTPAPI_WAIT_MODE:wait}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
@@ -151,6 +153,8 @@ handle @anidbhttpAnime {
 		duration {$HTTPAPI_MIN_DURATION:5s}
 		# optional: jitter factor (fraction of duration) via HTTPAPI_MIN_DURATION_JITTER (default 0.01)
 		jitter_factor {$HTTPAPI_MIN_DURATION_JITTER:0.01}
+		# This is the normal default.  Jellyfin does not handle "redirect" responses.
+		wait_mode {$HTTPAPI_WAIT_MODE:wait}
 	}
 	error_body_status {
 		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
