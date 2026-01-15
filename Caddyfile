@@ -1,34 +1,46 @@
 {
 	admin off
+	order min_duration before respond
+	order error_body_status before respond
+	order cache before min_duration
 	cache {
 		ttl 27h
 		default_cache_control public, max-age=86400
 		key {
 			disable_scheme
 			disable_host
+			disable_vary
 		}
+		log_level debug
 		nuts {
+			path {$CACHE_DIR:/cache}
 			configuration {
-				Dir /data/nuts
-				EntryIdxMode 1
-				NodeNum 42
-				EnableHintFile true
-				EnableMergeV2 true
+				Dir {$CACHE_DIR:/cache}
+				SyncEnable true
 			}
 		}
+		# Simplefs is not used because it does support cache reload on startup
+		# simplefs {
+		# 	path /cache
+		# 	configuration {
+		# 	}
+		# }
 	}
 }
 
 :80
+encode
 log {
 	output stdout
 	format json
 }
-@tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
-@compressible {
-	not path *.gz
+@healthcheck {
+	remote_ip 127.0.0.1
+	path /
+	header User-Agent Wget
 }
-encode @compressible 
+log_skip @healthcheck
+@tracingEnabled expression {env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT} != ""
 
 @anime_titles {
 	method GET HEAD
@@ -37,7 +49,6 @@ encode @compressible
 handle @anime_titles {
 	rewrite /httpapi/anime-titles.dat.gz /api/anime-titles.dat.gz
 	rewrite /httpapi/anime-titles.xml.gz /api/anime-titles.xml.gz
-	handle @tracingEnabled
 	cache
 	tracing {
 		span {path}
@@ -63,16 +74,100 @@ handle @anime_titles {
 @anidbhttp {
 	method GET
 	path /httpapi
+	not {
+		expression {query.request} == "anime" && {query.aid}.matches("^\\d+$")
+	}
 }
 handle @anidbhttp {
-	cache
 	handle @tracingEnabled
 	tracing {
 		span {path}
 	}
 
+	cache {
+		timeout {
+			backend {$HTTPAPI_BACKEND_TIMEOUT:300s}
+			cache 1s
+		}
+	}
+	min_duration {
+		# prevent flooding of multiple upstream requests
+		# duration is sourced from environment: HTTPAPI_MIN_DURATION (default 5s)
+		duration {$HTTPAPI_MIN_DURATION:5s}
+		# optional: jitter factor (fraction of duration) via HTTPAPI_MIN_DURATION_JITTER (default 0.01)
+		jitter_factor {$HTTPAPI_MIN_DURATION_JITTER:0.01}
+		# This is the normal default.  Jellyfin does not handle "redirect" responses.
+		wait_mode {$HTTPAPI_WAIT_MODE:wait}
+	}
+	error_body_status {
+		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
+		prefix `<error`
+		# the API spec actually says it returns 200 status code regardless of errors.
+		status 200
+		# status 500
+		not_found_status 200
+		# not_found_status 404
+		max_bytes 256
+	}
+
+	reverse_proxy {$HTTPAPI_BACKEND:http://api.anidb.net:9001} {
+		header_up Host {upstream_hostport}
+		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
+		header_up -X-Forwarded-For
+		header_up -X-Forwarded-Host
+		header_up -X-Forwarded-Proto
+		header_up Accept-Encoding identity
+		header_down -Cache-Control
+		header_down -Report-To
+		header_down -Content-Security-Policy-Report-Only
+		header_down -Cross-Origin-Opener-Policy
+		header_down -Cross-Origin-Resource-Policy
+		header_down -Link
+	}
+	log_append upstream_host {rp.upstream.host}
+	log_append cache_status {http.response.header.Cache-Status}
+}
+
+@anidbhttpAnime {
+	method GET
+	path /httpapi
+	expression {query.request} == "anime" && {query.aid}.matches("^\\d+$")
+}
+handle @anidbhttpAnime {
+	handle @tracingEnabled
+	tracing {
+		span {path}
+	}
+	cache {
+		timeout {
+			backend {$HTTPAPI_BACKEND_TIMEOUT:300s}
+			cache 1s
+		}
+		key {
+			template "anime-{query.aid}"
+		}
+	}
+	min_duration {
+		# prevent flooding of multiple upstream requests
+		# duration is sourced from environment: HTTPAPI_MIN_DURATION (default 5s)
+		duration {$HTTPAPI_MIN_DURATION:5s}
+		# optional: jitter factor (fraction of duration) via HTTPAPI_MIN_DURATION_JITTER (default 0.01)
+		jitter_factor {$HTTPAPI_MIN_DURATION_JITTER:0.01}
+		# This is the normal default.  Jellyfin does not handle "redirect" responses.
+		wait_mode {$HTTPAPI_WAIT_MODE:wait}
+	}
+	error_body_status {
+		# though the value `<error code="500">` may occur especially for banned, the API spec only specifies there's an <error> tag and makes no guarantees on the value.
+		prefix `<error`
+		# the API spec actually says it returns 200 status code regardless of errors.
+		status 200
+		# status 500
+		max_bytes 256
+	}
+
 	reverse_proxy http://api.anidb.net:9001 {
 		header_up Host {upstream_hostport}
+		header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Brave Chrome/92.0.4515.131 Safari/537.36"
 		header_up -X-Forwarded-For
 		header_up -X-Forwarded-Host
 		header_up -X-Forwarded-Proto

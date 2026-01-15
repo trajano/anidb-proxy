@@ -1,11 +1,14 @@
-FROM caddy:builder AS builder
+FROM caddy:2.10-builder AS builder
+
+COPY caddy-anidb-handlers /caddy-anidb-handlers
 
 RUN  --mount=type=cache,target=/go/pkg/mod \
      --mount=type=cache,target=/root/.cache/go-build \
      xcaddy build \
-     --with github.com/caddyserver/cache-handler \
-     --with github.com/darkweak/storages/nuts/caddy \
-     --with github.com/mohammed90/caddy-throttle-listener
+     --with github.com/trajano/anidb-proxy/caddy-anidb-handlers=/caddy-anidb-handlers \
+     --with github.com/caddyserver/cache-handler@v0.16.0 \
+     --with github.com/darkweak/storages/nuts/caddy@v0.0.16 \
+     --with github.com/darkweak/storages/simplefs/caddy@v0.0.16
 
 FROM busybox:1.36.1-uclibc AS staging
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
