@@ -16,10 +16,11 @@ The `/httpapi` route applies two extra behaviors:
 * If the first bytes of the response (after gzip decoding) contain `<error`, the proxy sets `Cache-Control: no-store` to avoid caching error responses.
 * `request=anime` only keys against `aid` and drops the other query parameters for the key
 
-You can configure two environment variables:
+You can configure these environment variables:
 
-- `HTTPAPI_MIN_DURATION` (default: `3s`) — the minimum spacing between upstream calls enforced by the `min_duration` handler.
+- `HTTPAPI_MIN_DURATION` (default: `5s`) — the minimum spacing between upstream calls enforced by the `min_duration` handler.
 - `HTTPAPI_BACKEND_TIMEOUT` (default: `300s`) — the cache backend timeout used for upstream backend requests.
+- `HTTPAPI_BACKEND` (default: `http://api.anidb.net:9001`) — the upstream backend URL; you can point this at another proxy instance to chain with a friend and balance request limits.
 
 Important: `HTTPAPI_BACKEND_TIMEOUT` must be at least as large as `HTTPAPI_MIN_DURATION`, and in practice should be larger because multiple requests may queue behind the first and each queued request increases the time the backend needs to serve them. A recommended tuning starting point is to set `HTTPAPI_BACKEND_TIMEOUT` to 100× `HTTPAPI_MIN_DURATION`.
 
@@ -30,7 +31,7 @@ services:
   anidb-proxy:
     image: ghcr.io/trajano/anidb-proxy:latest
     environment:
-      - HTTPAPI_MIN_DURATION=3s
+      - HTTPAPI_MIN_DURATION=5s
       - HTTPAPI_BACKEND_TIMEOUT=300s
       - HTTPAPI_MIN_DURATION_JITTER=0.01
 ```

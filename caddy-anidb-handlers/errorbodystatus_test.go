@@ -48,8 +48,8 @@ func TestBufferingWriterFlushErrorHandling(t *testing.T) {
 		if recorder.Code != http.StatusNotFound {
 			t.Fatalf("expected status %d, got %d", http.StatusNotFound, recorder.Code)
 		}
-		if cacheControl := recorder.Header().Get("Cache-Control"); cacheControl == "no-store" {
-			t.Fatalf("expected Cache-Control to allow caching, got %q", cacheControl)
+		if cacheControl := recorder.Header().Get("Cache-Control"); cacheControl != "public, max-age=3600" {
+			t.Fatalf("expected Cache-Control public, max-age=3600, got %q", cacheControl)
 		}
 		if body := recorder.Body.String(); body != string(payload) {
 			t.Fatalf("expected body %q, got %q", string(payload), body)

@@ -173,6 +173,7 @@ func (bw *bufferingWriter) Write(p []byte) (int, error) {
 		matchesError, matchesNotFound := bw.matchBodyTokens()
 		if matchesNotFound {
 			bw.code = bw.notFoundStatus
+			bw.ResponseWriter.Header().Set("Cache-Control", "public, max-age=3600")
 		}
 		if matchesError {
 			bw.code = bw.status
@@ -203,6 +204,7 @@ func (bw *bufferingWriter) Flush() {
 		matchesError, matchesNotFound := bw.matchBodyTokens()
 		if matchesNotFound {
 			bw.code = bw.notFoundStatus
+			bw.ResponseWriter.Header().Set("Cache-Control", "public, max-age=3600")
 		}
 		if matchesError {
 			bw.code = bw.status
@@ -258,6 +260,7 @@ func (bw *bufferingWriter) flushIfNeeded() {
 	matchesError, matchesNotFound := bw.matchBodyTokens()
 	if matchesNotFound {
 		bw.code = bw.notFoundStatus
+		bw.ResponseWriter.Header().Set("Cache-Control", "public, max-age=3600")
 	}
 	if matchesError {
 		bw.code = bw.status
@@ -296,6 +299,12 @@ func (bw *bufferingWriter) matchBodyTokens() (bool, bool) {
 	}
 	matchesError := len(bw.prefix) > 0 && bytes.Contains(payload, bw.prefix)
 	matchesNotFound := len(bw.notFoundMessage) > 0 && bytes.Contains(payload, bw.notFoundMessage)
+	if matchesError {
+		caddy.Log().Error("body tokens matched: error")
+	}
+	if matchesNotFound {
+		caddy.Log().Warn("body tokens matched: not_found")
+	}
 	return matchesError, matchesNotFound
 }
 
