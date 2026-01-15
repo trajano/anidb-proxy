@@ -45,7 +45,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	}
 	notFoundMessage := []byte(h.NotFoundMessage)
 	if len(notFoundMessage) == 0 {
-		prefix = []byte(`<error>Anime not found</error>`)
+		notFoundMessage = []byte(`<error>Anime not found</error>`)
 	}
 
 	status := h.Status
